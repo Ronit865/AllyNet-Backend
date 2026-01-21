@@ -2,8 +2,9 @@ import express from 'express';
 import { upload } from '../middlewares/multer.middleware.js';
 import { verifyAdminJWT } from '../middlewares/auth.middleware.js';
 import { deleteUser, getAllUser } from '../controllers/user.controller.js';
+import { getReports, getReportedUsers, banUser, unbanUser, dismissReport } from '../controllers/report.controller.js';
 
-import { addStudentCsv, changeAdminPassword, editUserDetails,  getCurrentAdmin,  updateAdminAvatar, updateAdminProfile,  } from '../controllers/admin.controller.js';
+import { addStudentCsv, changeAdminPassword, editUserDetails, getCurrentAdmin, updateAdminAvatar, updateAdminProfile, } from '../controllers/admin.controller.js';
 
 const router = express.Router();
 
@@ -28,5 +29,12 @@ router.route("/current-admin").get(verifyAdminJWT, getCurrentAdmin);
 router.route("/current").get(verifyAdminJWT, getCurrentAdmin);
 
 router.route("/update-profile").patch(verifyAdminJWT, updateAdminProfile);
+
+// Reports management routes
+router.route("/reports").get(verifyAdminJWT, getReports);
+router.route("/reported-users").get(verifyAdminJWT, getReportedUsers);
+router.route("/users/:userId/ban").post(verifyAdminJWT, banUser);
+router.route("/users/:userId/unban").post(verifyAdminJWT, unbanUser);
+router.route("/reports/:reportId/dismiss").patch(verifyAdminJWT, dismissReport);
 
 export default router;

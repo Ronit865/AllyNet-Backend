@@ -10,6 +10,11 @@ import { createNotification } from './notification.controller.js';
 
 // Create a new post
 const createPost = asyncHandler(async (req, res) => {
+  // Check if user is banned
+  if (req.user.banStatus === 'suspended' || req.user.banStatus === 'temp_banned') {
+    throw new ApiError(403, `You are banned from posting. Reason: ${req.user.banReason || 'Community guidelines violation'}`);
+  }
+
   const { content, category } = req.body;
 
   if (!content || !content.trim()) {
@@ -53,20 +58,20 @@ const createPost = asyncHandler(async (req, res) => {
 
 // Get all posts with pagination and filters
 const getAllPosts = asyncHandler(async (req, res) => {
-  const { 
-    page = 1, 
-    limit = 10, 
-    category, 
-    sortBy = 'createdAt', 
+  const {
+    page = 1,
+    limit = 10,
+    category,
+    sortBy = 'createdAt',
     order = 'desc',
-    search 
+    search
   } = req.query;
 
   const skip = (page - 1) * limit;
-  
+
   // Build query
   let query = { isActive: true };
-  
+
   if (category && category !== 'all') {
     query.category = category;
   }
@@ -176,15 +181,7 @@ const deletePost = asyncHandler(async (req, res) => {
     throw new ApiError(403, "You are not authorized to delete this post");
   }
 
-  // Check if post is within 24 hours (admins can delete anytime)
-  if (req.user.role !== 'admin') {
-    const postAge = Date.now() - new Date(post.createdAt).getTime();
-    const twentyFourHours = 24 * 60 * 60 * 1000;
-    
-    if (postAge > twentyFourHours) {
-      throw new ApiError(403, "Posts can only be deleted within 24 hours of posting");
-    }
-  }
+  // Removed 24-hour restriction - users can delete anytime
 
   post.isActive = false;
   await post.save();
@@ -386,11 +383,11 @@ const getUserPosts = asyncHandler(async (req, res) => {
 const getCommunicationStats = asyncHandler(async (req, res) => {
   const totalPosts = await Post.countDocuments({ isActive: true });
   const totalComments = await Comment.countDocuments({ isActive: true });
-  
+
   // Get active users (users who posted in last 30 days)
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-  
+
   const activeUsers = await Post.distinct('author', {
     createdAt: { $gte: thirtyDaysAgo },
     isActive: true
@@ -436,6 +433,69 @@ const togglePinPost = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, post, post.isPinned ? "Post pinned" : "Post unpinned"));
 });
 
+// Report a post
+const reportPost = asyncHandler(async (req, res) => {
+  const { postId } = req.params;
+  const { reason, description } = req.body;
+  const userId = req.user._id;
+
+  // Dynamically import Report model
+  const Report = (await import('../models/report.model.js')).default;
+
+  const post = await Post.findById(postId);
+
+  if (!post) {
+    throw new ApiError(404, "Post not found");
+  }
+
+  // Check if user is trying to report their own post
+  if (post.author.toString() === userId.toString()) {
+    throw new ApiError(400, "You cannot report your own post");
+  }
+
+  // Check if user already reported this post
+  const existingReport = await Report.findOne({ post: postId, reporter: userId });
+  if (existingReport) {
+    throw new ApiError(400, "You have already reported this post");
+  }
+
+  /* 
+     Update: logic changed to auto-suspend only after 3 reports.
+     Prevents immediate banning on single report.
+  */
+
+  // 1. Create the report
+  const report = await Report.create({
+    post: postId,
+    reporter: userId,
+    reason: reason || 'other',
+    description: description || ''
+  });
+
+  // 2. Increment report count for the author
+  const author = await User.findById(post.author);
+  if (author) {
+    author.reportCount = (author.reportCount || 0) + 1;
+
+    // 3. Check threshold for auto-suspension (3 reports)
+    // Only suspend if not already banned/suspended
+    if (author.reportCount >= 3 && author.banStatus === 'active') {
+      author.banStatus = 'temp_banned';
+      author.banReason = 'Automatic suspension: Received 3 or more reports';
+      // Set expiration to 3 days from now
+      const threeDaysFromNow = new Date();
+      threeDaysFromNow.setDate(threeDaysFromNow.getDate() + 3);
+      author.banExpiresAt = threeDaysFromNow;
+    }
+
+    await author.save();
+  }
+
+  return res
+    .status(201)
+    .json(new ApiResponse(201, { reported: true }, "Post reported successfully"));
+});
+
 export {
   createPost,
   getAllPosts,
@@ -448,5 +508,6 @@ export {
   getSavedPosts,
   getUserPosts,
   getCommunicationStats,
-  togglePinPost
+  togglePinPost,
+  reportPost
 };

@@ -81,6 +81,23 @@ const userSchema = new mongoose.Schema({
   },
   resetPasswordExpires: {
     type: Date,
+  },
+  banStatus: {
+    type: String,
+    enum: ['active', 'temp_banned', 'suspended'],
+    default: 'active'
+  },
+  banReason: {
+    type: String,
+    default: null
+  },
+  banExpiresAt: {
+    type: Date,
+    default: null
+  },
+  reportCount: {
+    type: Number,
+    default: 0
   }
 }, { timestamps: true })
 

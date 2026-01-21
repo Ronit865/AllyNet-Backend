@@ -11,7 +11,8 @@ import {
   getSavedPosts,
   getUserPosts,
   getCommunicationStats,
-  togglePinPost
+  togglePinPost,
+  reportPost
 } from '../controllers/post.controller.js';
 import {
   createComment,
@@ -57,6 +58,9 @@ router.route('/posts/:postId/save')
 
 router.route('/posts/:postId/pin')
   .post(verifyJWT, togglePinPost);
+
+router.route('/posts/:postId/report')
+  .post(verifyJWT, reportPost);
 
 // Comment routes
 router.route('/comments')

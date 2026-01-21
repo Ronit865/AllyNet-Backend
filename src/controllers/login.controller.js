@@ -117,6 +117,20 @@ const login = asyncHandler(async (req, res) => {
             throw new ApiError(401, "Incorrect password. Please try again.")
         }
 
+        // Check ban status
+        // Check ban status
+        if (user.banStatus === 'temp_banned') {
+            // Check if ban has expired
+            if (user.banExpiresAt && new Date() > new Date(user.banExpiresAt)) {
+                // Unban the user
+                user.banStatus = 'active';
+                user.banReason = null;
+                user.banExpiresAt = null;
+                await user.save({ validateBeforeSave: false });
+            }
+        }
+        // Proceed with login even if suspended or temp_banned (communication restricted elsewhere)
+
         const { accessToken, refreshToken } = await generateUserAccessAndRefreshToken(user._id)
 
         const loggedInUser = await User.findById(user._id).select('-password -refreshToken');
@@ -259,8 +273,8 @@ const forgotPassword = asyncHandler(async (req, res) => {
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
             try {
                 const emailPromise = sendOTPEmail(email, otp);
-                const timeoutPromise = new Promise((_, reject) => 
-                    setTimeout(() => reject(new Error(`Email timeout after ${timeoutDuration/1000}s (attempt ${attempt})`)), timeoutDuration)
+                const timeoutPromise = new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error(`Email timeout after ${timeoutDuration / 1000}s (attempt ${attempt})`)), timeoutDuration)
                 );
 
                 emailResult = await Promise.race([emailPromise, timeoutPromise]);
@@ -284,7 +298,7 @@ const forgotPassword = asyncHandler(async (req, res) => {
             if (process.env.NODE_ENV === 'development' || process.env.SHOW_OTP_ON_FAIL === 'true') {
                 return res
                     .status(200)
-                    .json(new ApiResponse(200, { 
+                    .json(new ApiResponse(200, {
                         devMode: true,
                         message: "Email service temporarily unavailable. Check console for OTP.",
                         otp: process.env.SHOW_OTP_IN_RESPONSE === 'true' ? otp : undefined
@@ -301,12 +315,12 @@ const forgotPassword = asyncHandler(async (req, res) => {
                 admin.resetPasswordExpires = undefined;
                 await admin.save({ validateBeforeSave: false });
             }
-            
+
             const isTimeoutError = lastError && lastError.includes('timeout');
-            const errorMessage = isTimeoutError 
+            const errorMessage = isTimeoutError
                 ? 'Email service is currently slow. Please try again in a few minutes.'
                 : `Email service error: ${lastError}`;
-            
+
             throw new ApiError(503, errorMessage);
         }
 
@@ -318,7 +332,7 @@ const forgotPassword = asyncHandler(async (req, res) => {
         if (error instanceof ApiError) {
             throw error;
         }
-        
+
         throw new ApiError(500, `Failed to process password reset request: ${error.message}`);
     }
 })
@@ -341,7 +355,7 @@ const verifyOTP = asyncHandler(async (req, res) => {
         resetPasswordOTP: otp,
         resetPasswordExpires: { $gt: Date.now() }
     });
-    
+
     if (!user && !admin) {
         throw new ApiError(400, "Invalid or expired OTP");
     }

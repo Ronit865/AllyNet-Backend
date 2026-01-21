@@ -85,14 +85,18 @@ export const sendMessage = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Your message contains inappropriate content. Please remove offensive language and try again.");
   }
 
-  // Verify conversation exists and user is participant
+  // Check if user is banned
+  const currentUser = req.user || req.admin;
+  if (!req.admin && (currentUser.banStatus === 'suspended' || currentUser.banStatus === 'temp_banned')) {
+    throw new ApiError(403, `You are banned from sending messages. Reason: ${currentUser.banReason || 'Community guidelines violation'}`);
+  }
   const conversation = await Conversation.findById(conversationId);
-  
+
   if (!conversation) {
     throw new ApiError(404, "Conversation not found");
   }
 
-  const currentUser = req.user || req.admin;
+
   const isParticipant = conversation.participants.some(
     p => p.toString() === currentUser._id.toString()
   );
@@ -144,7 +148,7 @@ export const getConversationMessages = asyncHandler(async (req, res) => {
 
   // Verify conversation exists and user is participant
   const conversation = await Conversation.findById(conversationId);
-  
+
   if (!conversation) {
     throw new ApiError(404, "Conversation not found");
   }
@@ -204,7 +208,7 @@ export const markMessagesAsRead = asyncHandler(async (req, res) => {
 
   // Verify conversation exists and user is participant
   const conversation = await Conversation.findById(conversationId);
-  
+
   if (!conversation) {
     throw new ApiError(404, "Conversation not found");
   }
@@ -262,7 +266,7 @@ export const deleteMessage = asyncHandler(async (req, res) => {
 
   // Find the message
   const message = await Message.findById(messageId);
-  
+
   if (!message) {
     throw new ApiError(404, "Message not found");
   }

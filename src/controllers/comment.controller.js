@@ -10,6 +10,11 @@ import { containsInappropriateContent } from '../utils/contentFilter.js';
 const createComment = asyncHandler(async (req, res) => {
   const { content, postId, parentCommentId } = req.body;
 
+  // Check if user is banned
+  if (req.user.banStatus === 'suspended' || req.user.banStatus === 'temp_banned') {
+    throw new ApiError(403, `You are banned from commenting. Reason: ${req.user.banReason || 'Community guidelines violation'}`);
+  }
+
   if (!content || !content.trim()) {
     throw new ApiError(400, "Comment content is required");
   }
@@ -225,7 +230,7 @@ const deleteComment = asyncHandler(async (req, res) => {
   if (req.user.role !== 'admin') {
     const commentAge = Date.now() - new Date(comment.createdAt).getTime();
     const twentyFourHours = 24 * 60 * 60 * 1000;
-    
+
     if (commentAge > twentyFourHours) {
       throw new ApiError(403, "Comments can only be deleted within 24 hours of posting");
     }
