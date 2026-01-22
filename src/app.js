@@ -6,7 +6,7 @@ const app = express();
 
 //Basic middleware
 app.use(cors({
-  origin: ['https://alumni-vista-dash.lovable.app','https://allynet-app.vercel.app','http://localhost:5173','https://allynet.lovable.app'], 
+  origin: ['https://allynet-app.vercel.app','http://localhost:5173','https://allynet.lovable.app'], 
   credentials: true, 
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Set-Cookie', 'Cookie', 'X-Requested-With'],
