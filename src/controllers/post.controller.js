@@ -48,6 +48,10 @@ const createPost = asyncHandler(async (req, res) => {
     images: imageUrls
   });
 
+  // Process mentions
+  const { processMentions } = await import('../utils/mentions.js');
+  await processMentions(content, req.user._id, post._id, null, 'post');
+
   const populatedPost = await Post.findById(post._id)
     .populate('author', 'name avatar email graduationYear currentPosition company');
 

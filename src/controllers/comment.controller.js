@@ -49,6 +49,10 @@ const createComment = asyncHandler(async (req, res) => {
     parentComment: parentCommentId || null
   });
 
+  // Process mentions
+  const { processMentions } = await import('../utils/mentions.js');
+  await processMentions(content, req.user._id, postId, comment._id, 'comment');
+
   // Increment comment count on post
   post.commentsCount += 1;
   await post.save();
