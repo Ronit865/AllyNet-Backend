@@ -28,8 +28,8 @@ const addJob = asyncHandler(async (req, res) => {
     await newJob.save();
 
     return res
-    .status(201)
-    .json(new ApiResponse(201, 'Job added successfully', newJob));
+        .status(201)
+        .json(new ApiResponse(201, 'Job added successfully', newJob));
 });
 
 const editJob = asyncHandler(async (req, res) => {
@@ -58,11 +58,11 @@ const editJob = asyncHandler(async (req, res) => {
     }
 
     return res
-    .status(200)
-    .json(new ApiResponse(200, 'Job updated successfully', job));
+        .status(200)
+        .json(new ApiResponse(200, 'Job updated successfully', job));
 });
 
-const deleteJob = asyncHandler(async (req, res) => { 
+const deleteJob = asyncHandler(async (req, res) => {
 
     const job = await Job.findByIdAndDelete(
         req.params.id
@@ -73,16 +73,16 @@ const deleteJob = asyncHandler(async (req, res) => {
     }
 
     return res
-    .status(200)
-    .json(new ApiResponse(200, 'Job deleted successfully', {}));
+        .status(200)
+        .json(new ApiResponse(200, 'Job deleted successfully', {}));
 });
 
-const getAllJobs = asyncHandler(async (req, res) => { 
-    const jobs = await Job.find().select('+applicants');
+const getAllJobs = asyncHandler(async (req, res) => {
+    const jobs = await Job.find().select('+applicants').populate('applicants', 'name email avatar course graduationYear');
 
     return res
-    .status(200)
-    .json(new ApiResponse(200, jobs,'Jobs fetched successfully'));
+        .status(200)
+        .json(new ApiResponse(200, jobs, 'Jobs fetched successfully'));
 });
 
 const getMyPostedJobs = asyncHandler(async (req, res) => {
@@ -90,8 +90,8 @@ const getMyPostedJobs = asyncHandler(async (req, res) => {
     const jobs = await Job.find({ postedBy: userId });
 
     return res
-    .status(200)
-    .json(new ApiResponse(200, jobs ,'My posted jobs fetched successfully'));
+        .status(200)
+        .json(new ApiResponse(200, jobs, 'My posted jobs fetched successfully'));
 });
 
 const verifyJob = asyncHandler(async (req, res) => {
@@ -99,7 +99,7 @@ const verifyJob = asyncHandler(async (req, res) => {
     const job = await Job.findByIdAndUpdate(
         req.params.id,
         {
-            $set: { 
+            $set: {
                 isVerified: true
             }
         },
@@ -110,8 +110,8 @@ const verifyJob = asyncHandler(async (req, res) => {
         throw new ApiError(404, 'Job not found');
     }
     return res
-    .status(200)
-    .json(new ApiResponse(200, 'Job verified successfully', job));
+        .status(200)
+        .json(new ApiResponse(200, 'Job verified successfully', job));
 });
 
 const jobApply = asyncHandler(async (req, res) => {
@@ -124,7 +124,7 @@ const jobApply = asyncHandler(async (req, res) => {
         throw new ApiError(404, 'Job not found');
     }
 
-    if (job.applicants.includes(userId)){
+    if (job.applicants.includes(userId)) {
         throw new ApiError(400, 'You have already applied for this job');
     }
     // job.applicants.push is used to add the userId to the applicants array
@@ -132,8 +132,8 @@ const jobApply = asyncHandler(async (req, res) => {
     await job.save();
 
     return res
-    .status(200)
-    .json(new ApiResponse(200, 'Job applied successfully', job));
+        .status(200)
+        .json(new ApiResponse(200, 'Job applied successfully', job));
 
 });
 
@@ -147,7 +147,7 @@ const jobUnapply = asyncHandler(async (req, res) => {
         throw new ApiError(404, 'Job not found');
     }
 
-    if (!job.applicants.includes(userId)){
+    if (!job.applicants.includes(userId)) {
         throw new ApiError(400, 'You have not applied for this job');
     }
 
@@ -156,8 +156,8 @@ const jobUnapply = asyncHandler(async (req, res) => {
     await job.save();
 
     return res
-    .status(200)
-    .json(new ApiResponse(200, 'Application withdrawn successfully', job));
+        .status(200)
+        .json(new ApiResponse(200, 'Application withdrawn successfully', job));
 
 });
 
@@ -172,8 +172,8 @@ const jobApplicants = asyncHandler(async (req, res) => {
     }
 
     return res
-    .status(200)
-    .json(new ApiResponse(200, job.applicants,'Job applicants fetched successfully'));
+        .status(200)
+        .json(new ApiResponse(200, job.applicants, 'Job applicants fetched successfully'));
 });
 
 const jobRejectByAdmin = asyncHandler(async (req, res) => {
@@ -186,8 +186,8 @@ const jobRejectByAdmin = asyncHandler(async (req, res) => {
     await Job.findByIdAndDelete(id);
 
     return res
-    .status(200)
-    .json(new ApiResponse(200, 'Job rejected and deleted successfully', {}));
+        .status(200)
+        .json(new ApiResponse(200, 'Job rejected and deleted successfully', {}));
 });
 
 
