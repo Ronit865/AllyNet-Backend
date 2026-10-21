@@ -12,8 +12,18 @@ import logger, { logSecurity } from '../config/winston.config.js';
  */
 export const authenticateSocket = async (socket, next) => {
   try {
-    // Get token from handshake auth or query
+    const cookieHeader = socket.handshake.headers?.cookie || '';
+    const cookieToken = cookieHeader
+      .split(';')
+      .map((cookie) => cookie.trim())
+      .find((cookie) => cookie.startsWith('accessToken='))
+      ?.split('=')
+      .slice(1)
+      .join('=');
+
+    // Prefer the httpOnly cookie; legacy auth/query tokens remain supported.
     const token = 
+      cookieToken ||
       socket.handshake.auth?.token || 
       socket.handshake.headers?.authorization?.replace('Bearer ', '') ||
       socket.handshake.query?.token;

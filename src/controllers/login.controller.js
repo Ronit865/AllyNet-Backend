@@ -6,11 +6,18 @@ import otpGenerator from 'otp-generator';
 import { sendOtp } from '../services/otp.service.js';
 import jwt from 'jsonwebtoken';
 import { generateTokens } from '../services/auth.service.js';
-import { BAN_STATUS } from '../constants/roles.js';
+import { BAN_STATUS, isAdmin } from '../constants/roles.js';
 import mongoose from 'mongoose';
 
+const getCookieOptions = () => ({
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: process.env.COOKIE_SAME_SITE || 'lax',
+  path: '/'
+});
+
 const refreshAccessToken = asyncHandler(async (req, res) => {
-  const incomingRefreshToken = req.cookies.refreshToken || req.body.refreshToken || req.body.token;
+  const incomingRefreshToken = req.cookies.refreshToken;
 
   if (!incomingRefreshToken) {
     throw new ApiError(401, 'Unauthorized request');
@@ -28,18 +35,13 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
       throw new ApiError(401, 'Refresh token is expired');
     }
 
-    const options = {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production'
-    };
-
     const { accessToken, refreshToken: newRefreshToken } = await generateTokens(user);
 
     return res
       .status(200)
-      .cookie('accessToken', accessToken, options)
-      .cookie('refreshToken', newRefreshToken, options)
-      .json(new ApiResponse(200, { accessToken, refreshToken: newRefreshToken }, 'Access token refreshed'));
+      .cookie('accessToken', accessToken, getCookieOptions())
+      .cookie('refreshToken', newRefreshToken, getCookieOptions())
+      .json(new ApiResponse(200, null, 'Access token refreshed'));
   } catch (error) {
     throw new ApiError(401, error?.message || 'Invalid refresh token');
   }
@@ -67,7 +69,7 @@ const login = asyncHandler(async (req, res) => {
         name: adminDoc.name,
         email: adminDoc.email,
         password: adminDoc.password,
-        role: adminDoc.role || 'alumni',
+        role: adminDoc.role || 'admin',
         avatar: adminDoc.avatar,
         graduationYear: adminDoc.graduationYear,
         course: adminDoc.course,
@@ -112,31 +114,25 @@ const login = asyncHandler(async (req, res) => {
 
   const { accessToken, refreshToken } = await generateTokens(user);
   const loggedInUser = await User.findById(user._id).select('-password -refreshToken');
-
-  const options = {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production'
-  };
+  const userType = isAdmin(loggedInUser.role) ? 'admin' : 'user';
 
   return res
     .status(200)
-    .cookie('accessToken', accessToken, options)
-    .cookie('refreshToken', refreshToken, options)
-    .json(new ApiResponse(200, { user: loggedInUser, accessToken, refreshToken }, 'User logged in successfully'));
+    .cookie('accessToken', accessToken, getCookieOptions())
+    .cookie('refreshToken', refreshToken, getCookieOptions())
+    .json(new ApiResponse(200, {
+      user: loggedInUser,
+      userType
+    }, 'User logged in successfully'));
 });
 
 const logout = asyncHandler(async (req, res) => {
-  const options = {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production'
-  };
-
   await User.findByIdAndUpdate(req.user._id, { $unset: { refreshToken: 1 } }, { new: true });
 
   return res
     .status(200)
-    .clearCookie('accessToken', options)
-    .clearCookie('refreshToken', options)
+    .clearCookie('accessToken', getCookieOptions())
+    .clearCookie('refreshToken', getCookieOptions())
     .json(new ApiResponse(200, {}, 'User logged out successfully'));
 });
 

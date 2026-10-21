@@ -349,34 +349,6 @@ const downvoteComment = asyncHandler(async (req, res) => {
     }, hasDownvoted ? "Downvote removed" : "Comment downvoted"));
 });
 
-
-// Get replies for a comment
-const getCommentReplies = asyncHandler(async (req, res) => {
-  const { commentId } = req.params;
-  const page = parseInt(req.query.page) || 1;
-  const limit = parseInt(req.query.limit) || 20;
-  const skip = (page - 1) * limit;
-
-  const replies = await Comment.find({ parentComment: commentId })
-    .populate('author', 'name email avatar batch course')
-    .sort({ createdAt: 1 })
-    .skip(skip)
-    .limit(limit)
-    .lean();
-
-  const total = await Comment.countDocuments({ parentComment: commentId });
-
-  return res.status(200).json(new ApiResponse(200, {
-    replies,
-    pagination: {
-      page,
-      limit,
-      total,
-      pages: Math.ceil(total / limit)
-    }
-  }, 'Replies fetched successfully'));
-});
-
 export {
   createComment,
   getPostComments,
