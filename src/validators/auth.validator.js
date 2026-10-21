@@ -58,7 +58,6 @@ export const loginValidation = [
     .withMessage('Email is required')
     .isEmail()
     .withMessage('Please provide a valid email')
-    .normalizeEmail()
     .customSanitizer(normalizeEmail),
   
   body('password')

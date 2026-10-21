@@ -48,19 +48,37 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
 });
 
 const login = asyncHandler(async (req, res) => {
-  const { email, password } = req.body;
+  const email = req.body.email?.trim().toLowerCase();
+  const { password } = req.body;
 
   if (!email || !password) {
     throw new ApiError(400, 'Email and password are required');
   }
 
   // Try to find user in users collection first
-  let user = await User.findOne({ email });
+  const escapedEmail = email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  let user = await User.findOne({
+    email: { $regex: `^${escapedEmail}$`, $options: 'i' }
+  });
+
+  if (!user) {
+    const rawUser = await mongoose.connection.collection('users').findOne({
+      $expr: {
+        $eq: [
+          { $toLower: { $trim: { input: '$email' } } },
+          email
+        ]
+      }
+    });
+    user = rawUser ? User.hydrate(rawUser) : null;
+  }
   
   // If not found, check admins collection (legacy data migration)
   if (!user) {
     const adminsCollection = mongoose.connection.collection('admins');
-    const adminDoc = await adminsCollection.findOne({ email });
+    const adminDoc = await adminsCollection.findOne({
+      email: { $regex: `^${escapedEmail}$`, $options: 'i' }
+    });
     
     if (adminDoc) {
       // Migrate admin to users collection

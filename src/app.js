@@ -18,8 +18,15 @@ app.use(httpLogger);
 app.use(securityMiddleware);
 
 // CORS Configuration
+const allowedOrigins = [
+  'https://allynet-app.vercel.app',
+  'http://localhost:5173',
+  'https://allynet.lovable.app',
+  ...(process.env.CORS_ORIGIN || '').split(',').map(origin => origin.trim()).filter(Boolean)
+];
+
 app.use(cors({
-  origin: ['https://allynet-app.vercel.app','http://localhost:5173','https://allynet.lovable.app'], 
+  origin: allowedOrigins,
   credentials: true, 
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Set-Cookie', 'Cookie', 'X-Requested-With'],
