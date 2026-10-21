@@ -5,6 +5,7 @@ import ApiError from "../utils/ApiError.js";
 import ApiResponse from "../utils/ApiResponse.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import { containsInappropriateContent } from "../utils/contentFilter.js";
+import { emitNewMessage, emitNewNotification } from "../services/socket.service.js";
 
 // Get or create conversation
 export const getOrCreateConversation = asyncHandler(async (req, res) => {
@@ -124,17 +125,28 @@ export const sendMessage = asyncHandler(async (req, res) => {
 
   // Create notification for recipient
   if (recipient) {
-    await Notification.create({
+    const notification = await Notification.create({
       recipient: recipient,
       sender: currentUser._id,
       type: 'message',
       title: 'New Message',
       message: `${currentUser.name} sent you a message`
     });
+
+    // Emit Socket.io notification event for real-time notification
+    emitNewNotification(recipient.toString(), notification);
   }
 
   const populatedMessage = await Message.findById(message._id)
     .populate('sender', 'name avatar email');
+
+  // Emit Socket.io event to recipient for real-time delivery
+  if (recipient) {
+    emitNewMessage(recipient.toString(), {
+      ...populatedMessage.toObject(),
+      conversation: conversationId
+    });
+  }
 
   res.status(201).json(
     new ApiResponse(201, populatedMessage, "Message sent successfully")

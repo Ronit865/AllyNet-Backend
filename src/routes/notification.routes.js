@@ -1,22 +1,18 @@
-import { Router } from "express";
-import { 
-  getNotifications, 
-  markAsRead, 
-  markAllAsRead, 
-  deleteNotification,
-  getUnreadCount
-} from "../controllers/notification.controller.js";
-import { verifyUserOrAdmin } from "../middlewares/auth.middleware.js";
+import express from "express";
+import { getNotifications, markAsRead, markAllAsRead, deleteNotification, getUnreadCount } from "../controllers/notification.controller.js";
+import { authenticate } from "../middlewares/auth.middleware.js";
+import { generalLimiter } from "../middlewares/rateLimiter.middleware.js";
+import { validatePagination } from "../middlewares/validation.middleware.js";
 
-const router = Router();
+const router = express.Router();
 
-// All routes require authentication (user or admin)
-router.use(verifyUserOrAdmin);
+router.use(authenticate);
+router.use(generalLimiter);
 
-router.get("/", getNotifications);
-router.get("/unread-count", getUnreadCount);
+router.get("/", validatePagination, getNotifications);
 router.patch("/:notificationId/read", markAsRead);
-router.patch("/mark-all-read", markAllAsRead);
+router.patch("/read-all", markAllAsRead);
 router.delete("/:notificationId", deleteNotification);
+router.get("/unread/count", getUnreadCount);
 
 export default router;

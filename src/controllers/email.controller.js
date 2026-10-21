@@ -2,7 +2,7 @@ import asyncHandler from "../utils/asyncHandler.js";
 import ApiResponse from "../utils/ApiResponse.js";
 import ApiError from "../utils/ApiError.js";
 import Email from "../models/email.model.js";
-import { sendEmail as sendEmailService, sendBulkEmail, sendTemplateEmail } from "../services/emailServices.js";
+import { sendEmail as sendEmailService, sendBulkEmail, sendTemplateEmail } from '../services/email.service.js';
 
 const sendBulkEmails = asyncHandler(async (req, res) => {
     const { subject, body, filter, type } = req.body;

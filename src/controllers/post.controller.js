@@ -7,6 +7,7 @@ import ApiResponse from '../utils/ApiResponse.js';
 import { uploadOnCloudinary, deleteFromCloudinary, extractPublicId } from '../utils/cloudinary.js';
 import { containsInappropriateContent } from '../utils/contentFilter.js';
 import { createNotification } from './notification.controller.js';
+import { emitNewPost, emitPostUpdate, emitPostDelete } from '../services/socket.service.js';
 
 // Create a new post
 const createPost = asyncHandler(async (req, res) => {
@@ -54,6 +55,9 @@ const createPost = asyncHandler(async (req, res) => {
 
   const populatedPost = await Post.findById(post._id)
     .populate('author', 'name avatar email graduationYear currentPosition company');
+
+  // Emit Socket.io event for real-time post creation
+  emitNewPost(populatedPost);
 
   return res
     .status(201)
@@ -165,6 +169,9 @@ const updatePost = asyncHandler(async (req, res) => {
   const updatedPost = await Post.findById(postId)
     .populate('author', 'name avatar email graduationYear currentPosition company');
 
+  // Emit Socket.io event for real-time post update
+  emitPostUpdate(updatedPost);
+
   return res
     .status(200)
     .json(new ApiResponse(200, updatedPost, "Post updated successfully"));
@@ -180,8 +187,11 @@ const deletePost = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Post not found");
   }
 
+  const { isAdmin } = await import('../constants/roles.js');
+  const userIsAdmin = isAdmin(req.user.role);
+
   // Check if user is the author or admin
-  if (post.author.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+  if (post.author.toString() !== req.user._id.toString() && !userIsAdmin) {
     throw new ApiError(403, "You are not authorized to delete this post");
   }
 
@@ -189,6 +199,9 @@ const deletePost = asyncHandler(async (req, res) => {
 
   post.isActive = false;
   await post.save();
+
+  // Emit Socket.io event for real-time post deletion
+  emitPostDelete(postId);
 
   return res
     .status(200)
@@ -418,8 +431,11 @@ const getCommunicationStats = asyncHandler(async (req, res) => {
 // Pin/Unpin a post (admin only)
 const togglePinPost = asyncHandler(async (req, res) => {
   const { postId } = req.params;
+  
+  const { isAdmin } = await import('../constants/roles.js');
+  const userIsAdmin = isAdmin(req.user.role);
 
-  if (req.user.role !== 'admin') {
+  if (!userIsAdmin) {
     throw new ApiError(403, "Only admins can pin posts");
   }
 

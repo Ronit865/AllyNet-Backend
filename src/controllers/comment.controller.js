@@ -5,15 +5,13 @@ import ApiError from '../utils/ApiError.js';
 import ApiResponse from '../utils/ApiResponse.js';
 import { createNotification } from './notification.controller.js';
 import { containsInappropriateContent } from '../utils/contentFilter.js';
+import { emitNewComment } from '../services/socket.service.js';
 
 // Create a new comment
 const createComment = asyncHandler(async (req, res) => {
   const { content, postId, parentCommentId } = req.body;
 
-  // Check if user is banned
-  if (req.user.banStatus === 'suspended' || req.user.banStatus === 'temp_banned') {
-    throw new ApiError(403, `You are banned from commenting. Reason: ${req.user.banReason || 'Community guidelines violation'}`);
-  }
+  // Ban check handled by requireNotBanned middleware in routes
 
   if (!content || !content.trim()) {
     throw new ApiError(400, "Comment content is required");
@@ -64,26 +62,35 @@ const createComment = asyncHandler(async (req, res) => {
   if (parentCommentId) {
     // Reply to comment - notify comment author
     const parentComment = await Comment.findById(parentCommentId).populate('author', 'name');
-    await createNotification({
-      recipient: parentComment.author._id,
-      sender: req.user._id,
-      type: 'reply',
-      title: `${req.user.name} replied to your comment`,
-      message: content.substring(0, 100),
-      postId: postId,
-      commentId: comment._id
-    });
+    if (parentComment && parentComment.author._id.toString() !== req.user._id.toString()) {
+      const notification = await createNotification({
+        recipient: parentComment.author._id,
+        sender: req.user._id,
+        type: 'comment',
+        title: `${req.user.name} replied to your comment`,
+        message: content.substring(0, 100),
+        postId,
+        commentId: comment._id
+      });
+      // Emit socket event for real-time notification
+      emitNewComment(parentComment.author._id.toString(), notification);
+    }
   } else {
     // Comment on post - notify post author
-    await createNotification({
-      recipient: post.author,
-      sender: req.user._id,
-      type: 'comment',
-      title: `${req.user.name} commented on your post`,
-      message: content.substring(0, 100),
-      postId: postId,
-      commentId: comment._id
-    });
+    const postAuthor = await Post.findById(postId).populate('author', 'name');
+    if (postAuthor && postAuthor.author._id.toString() !== req.user._id.toString()) {
+      const notification = await createNotification({
+        recipient: postAuthor.author._id,
+        sender: req.user._id,
+        type: 'comment',
+        title: `${req.user.name} commented on your post`,
+        message: content.substring(0, 100),
+        postId,
+        commentId: comment._id
+      });
+      // Emit socket event for real-time notification
+      emitNewComment(postAuthor.author._id.toString(), notification);
+    }
   }
 
   return res
@@ -225,13 +232,16 @@ const deleteComment = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Comment not found");
   }
 
+  const { isAdmin } = await import('../constants/roles.js');
+  const userIsAdmin = isAdmin(req.user.role);
+
   // Check if user is the author or admin
-  if (comment.author.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+  if (comment.author.toString() !== req.user._id.toString() && !userIsAdmin) {
     throw new ApiError(403, "You are not authorized to delete this comment");
   }
 
   // Check if comment is within 24 hours (admins can delete anytime)
-  if (req.user.role !== 'admin') {
+  if (!userIsAdmin) {
     const commentAge = Date.now() - new Date(comment.createdAt).getTime();
     const twentyFourHours = 24 * 60 * 60 * 1000;
 
@@ -337,6 +347,34 @@ const downvoteComment = asyncHandler(async (req, res) => {
       hasUpvoted: false,
       hasDownvoted: !hasDownvoted
     }, hasDownvoted ? "Downvote removed" : "Comment downvoted"));
+});
+
+
+// Get replies for a comment
+const getCommentReplies = asyncHandler(async (req, res) => {
+  const { commentId } = req.params;
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 20;
+  const skip = (page - 1) * limit;
+
+  const replies = await Comment.find({ parentComment: commentId })
+    .populate('author', 'name email avatar batch course')
+    .sort({ createdAt: 1 })
+    .skip(skip)
+    .limit(limit)
+    .lean();
+
+  const total = await Comment.countDocuments({ parentComment: commentId });
+
+  return res.status(200).json(new ApiResponse(200, {
+    replies,
+    pagination: {
+      page,
+      limit,
+      total,
+      pages: Math.ceil(total / limit)
+    }
+  }, 'Replies fetched successfully'));
 });
 
 export {

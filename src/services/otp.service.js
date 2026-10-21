@@ -1,8 +1,7 @@
 import nodemailer from 'nodemailer';
 
-// Create transporter (note: createTransport, not createTransporter)
 const createTransporter = () => {
-    return nodemailer.createTransport({  // Fixed: createTransport instead of createTransporter
+    return nodemailer.createTransport({
         service: 'gmail',
         auth: {
             user: process.env.EMAIL_USER,
@@ -11,8 +10,7 @@ const createTransporter = () => {
     });
 };
 
-// Send OTP email
-export const sendOTPEmail = async (email, otp) => {
+export const sendOtp = async (email, otp) => {
     try {
         const transporter = createTransporter();
         

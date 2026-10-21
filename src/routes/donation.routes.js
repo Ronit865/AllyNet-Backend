@@ -1,25 +1,23 @@
 import express from 'express';
-import { verifyAdminJWT, verifyJWT } from '../middlewares/auth.middleware.js';
+import { authenticate, optionalAuth } from '../middlewares/auth.middleware.js';
+import { requirePermission } from '../middlewares/rbac.middleware.js';
+import { requireNotBanned } from '../middlewares/banCheck.middleware.js';
+import { generalLimiter } from '../middlewares/rateLimiter.middleware.js';
+import { validatePagination } from '../middlewares/validation.middleware.js';
+import { PERMISSIONS } from '../config/permissions.config.js';
 import { addCampaign, deleteCampaign, donationAmount, editCampaign, getCampaignDonors, getCampaigns, getRecentDonors, getDonationStats } from '../controllers/donation.controller.js';
 
 const router = express.Router();
 
-router.route("/addDonation").post(verifyAdminJWT, addCampaign)
-
-router.route("/editDonation/:id").patch(verifyAdminJWT, editCampaign)
-
-router.route("/donate/:id").post(donationAmount);
-
-router.route("/deleteDonation/:id").delete(verifyAdminJWT, deleteCampaign)
-
-router.route("/getDonations").get(getCampaigns)
-
-router.route("/donationAmount/:id").post(verifyJWT,donationAmount);
-
-router.route("/getDonors/:id").get(getCampaignDonors);
-
-router.route("/getRecentDonors").get(getRecentDonors);
-
-router.route("/getDonationStats").get(getDonationStats);
+router.get("/getDonations", optionalAuth, generalLimiter, validatePagination, getCampaigns);
+router.get("/getDonors/:id", optionalAuth, generalLimiter, getCampaignDonors);
+router.get("/recent-donors", optionalAuth, generalLimiter, getRecentDonors);
+router.get("/stats", optionalAuth, generalLimiter, getDonationStats);
+router.get("/getDonationStats", optionalAuth, generalLimiter, getDonationStats);
+router.post("/donate/:id", authenticate, requireNotBanned, requirePermission(PERMISSIONS.DONATION_CREATE), generalLimiter, donationAmount);
+router.post("/donationAmount/:id", authenticate, requireNotBanned, requirePermission(PERMISSIONS.DONATION_CREATE), generalLimiter, donationAmount);
+router.post("/addDonation", authenticate, requirePermission(PERMISSIONS.DONATION_MANAGE), generalLimiter, addCampaign);
+router.patch("/editDonation/:id", authenticate, requirePermission(PERMISSIONS.DONATION_MANAGE), generalLimiter, editCampaign);
+router.delete("/deleteDonation/:id", authenticate, requirePermission(PERMISSIONS.DONATION_MANAGE), generalLimiter, deleteCampaign);
 
 export default router;

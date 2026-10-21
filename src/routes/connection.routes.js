@@ -1,26 +1,30 @@
 import { Router } from "express";
 import {
   sendConnectionRequest,
-  acceptConnectionRequest,
-  rejectConnectionRequest,
   getConnectionStatus,
   getConnections,
   getPendingRequests,
+  acceptConnectionRequest,
+  rejectConnectionRequest,
   removeConnection
 } from "../controllers/connection.controller.js";
-import { verifyJWT } from "../middlewares/auth.middleware.js";
+import { authenticate } from "../middlewares/auth.middleware.js";
+import { requireNotBanned } from "../middlewares/banCheck.middleware.js";
+import { connectionRequestLimiter, generalLimiter } from "../middlewares/rateLimiter.middleware.js";
+import { requirePermission } from "../middlewares/rbac.middleware.js";
+import { PERMISSIONS } from "../config/permissions.config.js";
+import { validatePagination } from "../middlewares/validation.middleware.js";
 
 const router = Router();
 
-// All routes require authentication
-router.use(verifyJWT);
+router.use(authenticate);
 
-router.post("/request", sendConnectionRequest);
-router.get("/status/:userId", getConnectionStatus);
-router.get("/", getConnections);
-router.get("/pending", getPendingRequests);
-router.patch("/:connectionId/accept", acceptConnectionRequest);
-router.patch("/:connectionId/reject", rejectConnectionRequest);
-router.delete("/:connectionId", removeConnection);
+router.post("/request", requireNotBanned, requirePermission(PERMISSIONS.CONNECTION_REQUEST), connectionRequestLimiter, sendConnectionRequest);
+router.get("/requests", generalLimiter, validatePagination, getPendingRequests);
+router.post("/accept/:connectionId", requireNotBanned, requirePermission(PERMISSIONS.CONNECTION_MANAGE), generalLimiter, acceptConnectionRequest);
+router.post("/reject/:connectionId", requireNotBanned, requirePermission(PERMISSIONS.CONNECTION_MANAGE), generalLimiter, rejectConnectionRequest);
+router.get("/", generalLimiter, validatePagination, getConnections);
+router.get("/status/:userId", generalLimiter, getConnectionStatus);
+router.delete("/:connectionId", requirePermission(PERMISSIONS.CONNECTION_MANAGE), removeConnection);
 
 export default router;

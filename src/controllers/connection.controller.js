@@ -3,6 +3,7 @@ import ApiError from "../utils/ApiError.js";
 import ApiResponse from "../utils/ApiResponse.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import { createNotification } from "./notification.controller.js";
+import { emitConnectionRequest, emitConnectionAccepted, emitConnectionRejected } from "../services/socket.service.js";
 
 // Send connection request
 export const sendConnectionRequest = asyncHandler(async (req, res) => {
@@ -53,6 +54,9 @@ export const sendConnectionRequest = asyncHandler(async (req, res) => {
     message: 'wants to connect with you'
   });
 
+  // Emit real-time Socket.io event
+  emitConnectionRequest(recipientId, populatedConnection);
+
   res.status(201).json(
     new ApiResponse(201, populatedConnection, "Connection request sent successfully")
   );
@@ -92,6 +96,9 @@ export const acceptConnectionRequest = asyncHandler(async (req, res) => {
     message: 'You are now connected'
   });
 
+  // Emit real-time Socket.io event
+  emitConnectionAccepted(connection.requester.toString(), populatedConnection);
+
   res.status(200).json(
     new ApiResponse(200, populatedConnection, "Connection request accepted")
   );
@@ -113,6 +120,9 @@ export const rejectConnectionRequest = asyncHandler(async (req, res) => {
 
   connection.status = 'rejected';
   await connection.save();
+
+  // Emit real-time Socket.io event
+  emitConnectionRejected(connection.requester.toString(), { connectionId });
 
   res.status(200).json(
     new ApiResponse(200, {}, "Connection request rejected")

@@ -1,21 +1,28 @@
 import express from 'express';
-import { verifyAdminJWT, verifyJWT } from '../middlewares/auth.middleware.js';
+import { authenticate, optionalAuth } from '../middlewares/auth.middleware.js';
+import { requirePermission, requireOwnershipOrPermission } from '../middlewares/rbac.middleware.js';
+import { requireNotBanned } from '../middlewares/banCheck.middleware.js';
+import { generalLimiter } from '../middlewares/rateLimiter.middleware.js';
+import { PERMISSIONS } from '../config/permissions.config.js';
 import { addEvent, deleteEvent, eventParticipants, getEvents, updateEvent, userEventJoin, userEventLeave } from '../controllers/event.controller.js';
 
 const router = express.Router();
 
-router.route("/addEvent").post(verifyAdminJWT, addEvent)
+router.get("/getEvents", optionalAuth, generalLimiter, getEvents);
+router.get("/getEventParticipants/:eventID", optionalAuth, generalLimiter, eventParticipants);
 
-router.route("/editEvent/:id").patch(verifyAdminJWT, updateEvent)
-
-router.route("/deleteEvent/:_id").delete(verifyAdminJWT, deleteEvent)
-
-router.route("/getEvents").get(getEvents)
-
-router.route("/getEventParticipants/:eventID").get(eventParticipants)
-
-router.route("/addUserToEvent/:eventID").post(verifyJWT, userEventJoin)
-
-router.route("/removeUserFromEvent/:eventID").post(verifyJWT, userEventLeave)
+router.post("/addEvent", authenticate, requireNotBanned, requirePermission(PERMISSIONS.EVENT_CREATE), generalLimiter, addEvent);
+router.patch("/editEvent/:id", authenticate, requireNotBanned, requireOwnershipOrPermission('event', 'id', async (eventId) => {
+  const { Event } = await import('../models/event.model.js');
+  const event = await Event.findById(eventId);
+  return event?.createdBy || event?.creator;
+}, PERMISSIONS.EVENT_UPDATE), generalLimiter, updateEvent);
+router.delete("/deleteEvent/:_id", authenticate, requireOwnershipOrPermission('event', '_id', async (eventId) => {
+  const { Event } = await import('../models/event.model.js');
+  const event = await Event.findById(eventId);
+  return event?.createdBy || event?.creator;
+}, PERMISSIONS.EVENT_DELETE), generalLimiter, deleteEvent);
+router.post("/addUserToEvent/:eventID", authenticate, requireNotBanned, generalLimiter, userEventJoin);
+router.post("/removeUserFromEvent/:eventID", authenticate, generalLimiter, userEventLeave);
 
 export default router;

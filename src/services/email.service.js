@@ -2,7 +2,6 @@ import nodemailer from 'nodemailer';
 import User from '../models/user.model.js';
 import Email from '../models/email.model.js';
 
-// Create transporter
 const createTransporter = () => {
     return nodemailer.createTransport({
         service: 'gmail',
@@ -13,7 +12,6 @@ const createTransporter = () => {
     });
 };
 
-// Enhanced email template with header and footer
 const createEmailTemplate = (subject, body) => {
     return `
         <!DOCTYPE html>
@@ -104,7 +102,6 @@ const createEmailTemplate = (subject, body) => {
     `;
 };
 
-// Send email to individual recipient
 export const sendEmail = async (to, subject, body) => {
     try {
         const transporter = createTransporter();
@@ -128,7 +125,6 @@ export const sendEmail = async (to, subject, body) => {
     }
 };
 
-// Send bulk emails based on filter
 export const sendBulkEmail = async (subject, body, filter, type = 'quick_message', sentBy = null) => {
     try {
         let query = {};
@@ -208,7 +204,6 @@ export const sendBulkEmail = async (subject, body, filter, type = 'quick_message
     }
 };
 
-// Send email with custom template
 export const sendTemplateEmail = async (to, subject, templateData) => {
     return await sendEmail(to, subject, templateData.body);
 };

@@ -139,6 +139,10 @@ export const createNotification = async ({
       commentId
     });
 
+    // Emit Socket.io event for real-time notification delivery
+    const { emitNewNotification } = await import('../services/socket.service.js');
+    emitNewNotification(recipient.toString(), notification);
+
     return notification;
   } catch (error) {
     console.error("Error creating notification:", error);

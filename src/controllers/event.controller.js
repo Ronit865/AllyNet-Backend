@@ -2,12 +2,10 @@ import asyncHandler from "../utils/asyncHandler.js";
 import ApiError from '../utils/ApiError.js';
 import ApiResponse from "../utils/ApiResponse.js";
 import Event from "../models/event.model.js";
+import { emitToMultipleUsers } from "../services/socket.service.js";
 
 const addEvent = asyncHandler(async (req, res) => {
-    const admin = req.admin;
-    if (admin.role !== 'admin') {
-        throw new ApiError(403, "Forbidden: Only admin can add events");
-    }
+    const currentUser = req.user || req.admin;
     const { title, description, date, location, time } = req.body;
 
     try {
@@ -16,7 +14,8 @@ const addEvent = asyncHandler(async (req, res) => {
             description,
             date,
             location,
-            time
+            time,
+            createdBy: currentUser._id
         });
         res.status(201).json(new ApiResponse(201, event, "Event created successfully"));
     } catch (error) {
@@ -37,15 +36,10 @@ const getEvents = asyncHandler(async (req, res) => {
 });
 
 const updateEvent = asyncHandler(async (req, res) => {
-    const admin = req.admin;
-    if (admin.role !== 'admin') {
-        throw new ApiError(403, "Forbidden: Only admin can update events");
-    }
-
-    const { _id } = req.params;
+    const { id } = req.params;
     const { title, description, date, isactive , location, time } = req.body;
     try {
-        const event = await Event.findByIdAndUpdate(_id, {
+        const event = await Event.findByIdAndUpdate(id, {
             title,
             description,
             date,
@@ -60,10 +54,6 @@ const updateEvent = asyncHandler(async (req, res) => {
 });
 
 const deleteEvent = asyncHandler(async (req, res) => {
-    const admin = req.admin;
-    if (admin.role !== 'admin') {
-        throw new ApiError(403, "Forbidden: Only admin can delete events");
-    }
     const { _id } = req.params;
     try {
         await Event.findByIdAndDelete(_id);
@@ -117,13 +107,7 @@ const userEventJoin = asyncHandler(async (req, res) => {
 });
 
 const userEventLeave = asyncHandler(async (req, res) => {
-
     const user = req.user;
-
-    if (!user || !user._id) {
-        throw new ApiError(401, "Unauthorized: Please log in");
-    }
-
     const { eventID } = req.params;
 
     if (!eventID) {
@@ -131,7 +115,6 @@ const userEventLeave = asyncHandler(async (req, res) => {
     }
 
     try {
-
         const event = await Event.findById(eventID);
 
         if (!event) {
@@ -139,7 +122,6 @@ const userEventLeave = asyncHandler(async (req, res) => {
         }
 
         const userId = user._id.toString();
-
         const isParticipant = event.participants.some(
             participantId => participantId && participantId.toString() === userId
         );
@@ -153,13 +135,20 @@ const userEventLeave = asyncHandler(async (req, res) => {
         );
 
         await event.save();
-
         await event.populate('participants', 'name email avatar course');
+
+        // Emit real-time Socket.io event to remaining participants
+        const participantIds = event.participants.map(p => p._id ? p._id.toString() : p.toString());
+        emitToMultipleUsers(participantIds, 'event:participant:left', {
+            eventId: event._id,
+            userId: user._id.toString(),
+            userName: user.name,
+            participantCount: event.participants.length
+        });
 
         return res
         .status(200)
         .json(new ApiResponse(200, event, "User left the event successfully"));
-
     } catch (error) {
         throw new ApiError(500, "Failed to leave event");
     }

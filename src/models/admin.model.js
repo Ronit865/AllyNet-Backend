@@ -1,4 +1,4 @@
-import bcrypt from "bcryptjs";
+import bcrypt from "bcrypt";
 import mongoose from "mongoose";
 import jwt from "jsonwebtoken";
 
@@ -55,6 +55,7 @@ adminSchema.methods.generateAccessToken = async function () {
     expiresIn: process.env.ACCESS_TOKEN_EXPIRY
   });
 };
+
 adminSchema.methods.generateRefreshToken = async function () {
   return jwt.sign({
     _id: this._id
@@ -64,7 +65,6 @@ adminSchema.methods.generateRefreshToken = async function () {
   }
   );
 };
-
 
 const Admin = mongoose.model("Admin", adminSchema);
 

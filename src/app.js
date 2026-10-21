@@ -1,10 +1,23 @@
 import express from 'express';
 import cors from 'cors';   
 import cookieParser from 'cookie-parser';
+import securityMiddleware from './middlewares/security.middleware.js';
+import { httpLogger, requestId } from './middlewares/logger.middleware.js';
+import { generalLimiter } from './middlewares/rateLimiter.middleware.js';
+import { errorHandler, notFoundHandler } from './middlewares/errorHandler.middleware.js';
 
 const app = express();
 
-//Basic middleware
+// Request ID for tracing
+app.use(requestId);
+
+// HTTP Request Logging
+app.use(httpLogger);
+
+// Security middleware (Helmet, XSS protection, NoSQL injection prevention)
+app.use(securityMiddleware);
+
+// CORS Configuration
 app.use(cors({
   origin: ['https://allynet-app.vercel.app','http://localhost:5173','https://allynet.lovable.app'], 
   credentials: true, 
@@ -12,13 +25,21 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'Set-Cookie', 'Cookie', 'X-Requested-With'],
 }));
 
-app.use(express.json({limit:"50mb"}));  //limit incoming data
-app.use(express.urlencoded({extended:true, limit:"50mb"}));  // used for parsing incoming form data 
-app.use(express.static('public'))  //sets files in public as static
-app.use(cookieParser()) //used for cookie reading
+// Body parsers with reduced limits (more secure)
+app.use(express.json({limit:"10mb"}));  // Reduced from 50mb
+app.use(express.urlencoded({extended:true, limit:"10mb"}));  // Reduced from 50mb
+app.use(express.static('public'))  // Static files
+app.use(cookieParser())  // Cookie parsing
 
+// General rate limiting (apply to all routes)
+app.use('/api/', generalLimiter);
 
-//Routes
+// Health check endpoint (no rate limiting)
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok', timestamp: new Date() });
+});
+
+// Routes
 import userRouter from './routes/user.routes.js';
 import adminRouter from './routes/admin.routes.js';
 import eventRouter from './routes/events.routes.js';
@@ -42,5 +63,11 @@ app.use('/api/communications', postRouter);
 app.use('/api/notifications', notificationRouter);
 app.use('/api/connections', connectionRouter);
 app.use('/api/messages', messageRouter);
+
+// 404 handler (must be after all routes)
+app.use(notFoundHandler);
+
+// Global error handler (must be last)
+app.use(errorHandler);
 
 export default app;

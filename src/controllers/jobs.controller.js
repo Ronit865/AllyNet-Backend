@@ -2,9 +2,9 @@ import ApiResponse from '../utils/ApiResponse.js';
 import ApiError from '../utils/ApiError.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import Job from '../models/jobs.model.js';
+import { emitNewJob, emitJobApplication } from '../services/socket.service.js';
 
 const addJob = asyncHandler(async (req, res) => {
-
     const { title, company, description, location, jobType, category, experienceRequired, salary } = req.body;
 
     if (!title || !company || !description || !location || !jobType || !category || experienceRequired === undefined || salary === undefined) {
@@ -27,9 +27,15 @@ const addJob = asyncHandler(async (req, res) => {
 
     await newJob.save();
 
+    // Populate job poster info and emit Socket.io event
+    const populatedJob = await Job.findById(newJob._id)
+        .populate('postedBy', 'name email avatar company currentPosition');
+    
+    emitNewJob(populatedJob);
+
     return res
         .status(201)
-        .json(new ApiResponse(201, 'Job added successfully', newJob));
+        .json(new ApiResponse(201, 'Job added successfully', populatedJob));
 });
 
 const editJob = asyncHandler(async (req, res) => {
@@ -78,7 +84,10 @@ const deleteJob = asyncHandler(async (req, res) => {
 });
 
 const getAllJobs = asyncHandler(async (req, res) => {
-    const jobs = await Job.find().select('+applicants').populate('applicants', 'name email avatar course graduationYear');
+    const jobs = await Job.find()
+        .select('+applicants')
+        .populate('applicants', 'name email avatar course graduationYear')
+        .populate('postedBy', 'name email avatar company currentPosition');
 
     return res
         .status(200)
@@ -131,11 +140,20 @@ const jobApply = asyncHandler(async (req, res) => {
     job.applicants.push(userId);
     await job.save();
 
+    // Emit real-time Socket.io event to job poster
+    if (job.postedBy) {
+        emitJobApplication(job.postedBy.toString(), {
+            jobId: job._id,
+            jobTitle: job.title,
+            applicantId: userId,
+            applicantName: req.user.name
+        });
+    }
+
     return res
         .status(200)
         .json(new ApiResponse(200, 'Job applied successfully', job));
-
-});
+})
 
 const jobUnapply = asyncHandler(async (req, res) => {
 
