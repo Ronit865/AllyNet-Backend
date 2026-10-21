@@ -9,10 +9,15 @@ import { generateTokens } from '../services/auth.service.js';
 import { BAN_STATUS, isAdmin } from '../constants/roles.js';
 import mongoose from 'mongoose';
 
+const isProductionDeployment =
+  process.env.NODE_ENV === 'production' || process.env.RENDER === 'true';
+
 const getCookieOptions = () => ({
   httpOnly: true,
-  secure: process.env.NODE_ENV === 'production',
-  sameSite: process.env.COOKIE_SAME_SITE || 'lax',
+  secure: isProductionDeployment,
+  sameSite: process.env.COOKIE_SAME_SITE || (
+    isProductionDeployment ? 'none' : 'lax'
+  ),
   path: '/'
 });
 
