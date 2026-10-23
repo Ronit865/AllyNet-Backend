@@ -159,6 +159,20 @@ export const emitMessageRead = (senderId, readData) => {
 };
 
 /**
+ * Emit a delivery acknowledgement to the message sender.
+ * @param {string} senderId - Original message sender ID
+ * @param {Object} deliveryData - Delivery data
+ */
+export const emitMessageDelivered = (senderId, deliveryData) => {
+  try {
+    return emitToUser(senderId, SOCKET_EVENTS.MESSAGE_DELIVERED, deliveryData);
+  } catch (error) {
+    logger.error('Error emitting message delivered:', { error: error.message, senderId });
+    return false;
+  }
+};
+
+/**
  * Check if user is currently online
  * @param {string} userId - User ID
  * @returns {boolean}
@@ -273,6 +287,7 @@ export default {
   emitConnectionAccepted,
   emitConnectionRejected,
   emitMessageRead,
+  emitMessageDelivered,
   checkUserOnline,
   emitToMultipleUsers,
   broadcastAnnouncement,

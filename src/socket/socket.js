@@ -100,6 +100,12 @@ const handleConnection = (socket) => {
     userId,
     message: 'Connected successfully'
   });
+
+  // Send the current snapshot so this socket knows about users that connected
+  // before it did. The online event below keeps existing sockets up to date.
+  socket.emit(SOCKET_EVENTS.PRESENCE_LIST, {
+    onlineUsers: getOnlineUsers()
+  });
   
   // Register event handlers
   registerMessageHandlers(socket, io);

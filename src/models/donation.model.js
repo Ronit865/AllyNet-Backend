@@ -37,6 +37,34 @@ const donationSchema = new mongoose.Schema({
                 required: true,
                 min: 0
             },
+            paymentId: {
+                type: String,
+                required: false,
+                index: true
+            },
+            paymentIds: {
+                type: [String],
+                default: []
+            },
+            payments: [{
+                paymentId: {
+                    type: String,
+                    required: true
+                },
+                orderId: {
+                    type: String,
+                    required: true
+                },
+                amount: {
+                    type: Number,
+                    required: true,
+                    min: 0
+                },
+                paidAt: {
+                    type: Date,
+                    default: Date.now
+                }
+            }],
             donatedAt: {
                 type: Date,
                 default: Date.now

@@ -4,7 +4,7 @@ import { requirePermission, requireOwnershipOrPermission } from '../middlewares/
 import { requireNotBanned } from '../middlewares/banCheck.middleware.js';
 import { generalLimiter } from '../middlewares/rateLimiter.middleware.js';
 import { PERMISSIONS } from '../config/permissions.config.js';
-import { addEvent, deleteEvent, eventParticipants, getEvents, updateEvent, userEventJoin, userEventLeave } from '../controllers/event.controller.js';
+import { addEvent, createEventPaymentOrder, deleteEvent, eventParticipants, getEvents, updateEvent, userEventJoin, userEventLeave, verifyEventPayment } from '../controllers/event.controller.js';
 
 const router = express.Router();
 
@@ -23,6 +23,8 @@ router.delete("/deleteEvent/:_id", authenticate, requireOwnershipOrPermission('e
   return event?.createdBy || event?.creator;
 }, PERMISSIONS.EVENT_DELETE), generalLimiter, deleteEvent);
 router.post("/addUserToEvent/:eventID", authenticate, requireNotBanned, generalLimiter, userEventJoin);
+router.post("/payment/order/:eventID", authenticate, requireNotBanned, generalLimiter, createEventPaymentOrder);
+router.post("/payment/verify/:eventID", authenticate, requireNotBanned, generalLimiter, verifyEventPayment);
 router.post("/removeUserFromEvent/:eventID", authenticate, generalLimiter, userEventLeave);
 
 export default router;

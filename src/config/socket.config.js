@@ -97,6 +97,7 @@ export const SOCKET_EVENTS = {
   USER_STATUS: 'user:status',
   PRESENCE_REQUEST: 'presence:request',
   PRESENCE_UPDATE: 'presence:update',
+  PRESENCE_LIST: 'presence:list',
   
   // Feed events
   POST_NEW: 'post:new',

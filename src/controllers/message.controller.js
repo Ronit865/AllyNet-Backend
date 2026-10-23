@@ -5,7 +5,7 @@ import ApiError from "../utils/ApiError.js";
 import ApiResponse from "../utils/ApiResponse.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import { containsInappropriateContent } from "../utils/contentFilter.js";
-import { emitNewMessage, emitNewNotification } from "../services/socket.service.js";
+import { emitNewMessage, emitNewNotification, emitMessageRead } from "../services/socket.service.js";
 
 // Get or create conversation
 export const getOrCreateConversation = asyncHandler(async (req, res) => {
@@ -54,19 +54,25 @@ export const getUserConversations = asyncHandler(async (req, res) => {
     .sort({ lastMessageTime: -1 });
 
   // Transform to show the other participant
-  const transformedConversations = conversations.map(conv => {
+  const transformedConversations = await Promise.all(conversations.map(async (conv) => {
     const otherParticipant = conv.participants.find(
       p => p._id.toString() !== currentUser._id.toString()
     );
+    const unreadCount = await Message.countDocuments({
+      conversation: conv._id,
+      sender: { $ne: currentUser._id },
+      read: false
+    });
 
     return {
       _id: conv._id,
       participant: otherParticipant,
       lastMessage: conv.lastMessage,
       lastMessageTime: conv.lastMessageTime,
-      createdAt: conv.createdAt
+      createdAt: conv.createdAt,
+      unreadCount
     };
-  });
+  }));
 
   res.status(200).json(
     new ApiResponse(200, transformedConversations, "Conversations retrieved successfully")
@@ -234,18 +240,24 @@ export const markMessagesAsRead = asyncHandler(async (req, res) => {
     throw new ApiError(403, "You are not a participant in this conversation");
   }
 
-  // Mark all unread messages as read
+  // Capture the messages before updating so the original senders can be notified.
+  const unreadMessages = await Message.find({
+    conversation: conversationId,
+    sender: { $ne: currentUser._id },
+    read: false
+  }).select("_id sender");
+  const readAt = new Date();
+
   await Message.updateMany(
-    {
-      conversation: conversationId,
-      sender: { $ne: currentUser._id },
-      read: false
-    },
-    {
-      read: true,
-      readAt: new Date()
-    }
+    { _id: { $in: unreadMessages.map(message => message._id) } },
+    { read: true, readAt }
   );
+
+  const messageIds = unreadMessages.map(message => message._id.toString());
+  const senderIds = [...new Set(unreadMessages.map(message => message.sender.toString()))];
+  senderIds.forEach(senderId => {
+    emitMessageRead(senderId, { conversationId, messageIds, readAt });
+  });
 
   res.status(200).json(
     new ApiResponse(200, {}, "Messages marked as read")

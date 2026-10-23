@@ -25,6 +25,20 @@ const eventSchema = new mongoose.Schema({
         required: true,
         trim: true
     },
+    maxAttendees: {
+        type: Number,
+        min: 1,
+        default: null
+    },
+    isPaid: {
+        type: Boolean,
+        default: false
+    },
+    price: {
+        type: Number,
+        min: 0,
+        default: 0
+    },
     isactive: {
         type: Boolean,
         default: true

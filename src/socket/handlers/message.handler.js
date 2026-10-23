@@ -187,6 +187,8 @@ export const registerMessageHandlers = (socket, io) => {
           const senderRoom = getRoomName(ROOM_PREFIXES.USER, message.sender.toString());
           io.to(senderRoom).emit(SOCKET_EVENTS.MESSAGE_READ, {
             messageId,
+            conversationId: message.conversation.toString(),
+            messageIds: [messageId],
             readBy: userId,
             readAt: message.readAt
           });
@@ -215,6 +217,45 @@ export const registerMessageHandlers = (socket, io) => {
         error: error.message,
         userId,
         data
+      });
+
+      /**
+       * A recipient acknowledges that a real-time message reached their socket.
+       */
+      socket.on(SOCKET_EVENTS.MESSAGE_DELIVERED, async (data, callback) => {
+        try {
+          const { messageId, conversationId } = data;
+          if (!messageId || !conversationId) {
+            callback?.({ success: false, message: 'Message ID and conversation ID are required' });
+            return;
+          }
+
+          const message = await Message.findOne({
+            _id: messageId,
+            conversation: conversationId,
+            sender: { $ne: userId }
+          }).select('_id sender');
+
+          if (!message) {
+            callback?.({ success: false, message: 'Message not found' });
+            return;
+          }
+
+          const senderRoom = getRoomName(ROOM_PREFIXES.USER, message.sender.toString());
+          io.to(senderRoom).emit(SOCKET_EVENTS.MESSAGE_DELIVERED, {
+            messageId,
+            conversationId,
+            deliveredAt: new Date()
+          });
+          callback?.({ success: true });
+        } catch (error) {
+          logger.error('Error acknowledging message delivery:', {
+            error: error.message,
+            userId,
+            data
+          });
+          callback?.({ success: false, message: 'Failed to acknowledge delivery' });
+        }
       });
       
       if (callback) {
